@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>For my little Dummy eheh</title>
+    <style>
+        body {
+            background-color: #dc6be0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            border: 2px solid rgb(245, 107, 188);
+            display: block;
+            margin: 20px auto;
+        }
+
+        #startMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: block;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+        }
+
+        #winnerend {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+        }
+
+        #nameInput {
+            display: none;
+            margin-top: 20px;
+        }
+
+        #nameInput input {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="pacmanCanvas" width="1890" height="890"></canvas>
+    <div id="startMenu">
+        <img src="C:\Users\WDAGUtilityAccount\Desktop\background.jpg" alt="Menu Image" style="max-width: 100%;">
+        <h1>Hi dummy, I made a little game for you. It's gonna be easy, don't worry!
+            Use the MacBook to play it. Move your character with the arrows.
+            Good luck, my lame girl!
+        </h1>
+        <button onclick="showNameInput()">Start Game</button>
+        <div id="nameInput">
+            <label for="playerName">Your name is only one, p.s. Manu's girlfriend eheh :</label>
+            <input type="text" id="playerName" placeholder="Your Name">
+            <button onclick="startGame()">Start</button>
+        </div>
+    </div>
+    <div id="gameOver">
+        <h1>You suck eheh, kidding , try better stinky ass ! </h1>
+        <p>Score: <span id="score">0</span></p>
+        <button onclick="restartGame()">Restart</button>
+    </div>
+
+    <div id="winnerend">
+        <h1>I love you, you good not only in sex ha ! </h1>
+        <p>Score: <span id="score">0</span></p>
+        <button onclick="restartGame()">Restart</button>
+    </div>
+
+    <!-- Add an image element for the player character -->
+    <img id="playerImage" src="C:\Users\WDAGUtilityAccount\Desktop\player.png" style="display: none;">
+    <!-- Add an image element for the ghost character -->
+    <img id="ghostImage" src="C:\Users\WDAGUtilityAccount\Desktop\ghost.png" style="display: none;">
+
+    <script>
+        const canvas = document.getElementById("pacmanCanvas");
+        const context = canvas.getContext("2d");
+
+        const playerImage = document.getElementById("playerImage");
+        const ghostImage = document.getElementById("ghostImage");
+
+        const player = {
+            x: canvas.width / 2 - 25, // Adjust initial position based on image size
+            y: canvas.height / 2 - 25, // Adjust initial position based on image size
+            width: 50,
+            height: 50,
+            direction: { x: 1, y: 0 },
+            speed: 2
+        };
+
+        const ghost = {
+            x: Math.random() * (canvas.width - 40) + 20,
+            y: Math.random() * (canvas.height - 40) + 20,
+            width: 40,
+            height: 40,
+            speed: 1
+        };
+
+        const walls = [];
+        const stars = [];
+        let gameState = "startMenu";
+        let score = 0;
+        let playerName = ""; // Variable to store the player's name
+
+        // Keep track of pressed keys
+        const keysPressed = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false
+        };
+
+        function generateRandomWalls() {
+            // Generate a random number of walls
+            const numWalls = Math.floor(Math.random() * 10) + 5;
+
+            for (let i = 0; i < numWalls; i++) {
+                // Random wall position and dimensions
+                const wall = {
+                    x: Math.random() * (canvas.width - 100) + 50,
+                    y: Math.random() * (canvas.height - 100) + 50,
+                    width: Math.random() * 50 + 20,
+                    height: Math.random() * 50 + 20
+                };
+
+                walls.push(wall);
+            }
+        }
+
+        function generateMaze() {
+            walls.length = 0;
+            stars.length = 0;
+
+            // Outer walls
+            walls.push({ x: 0, y: 0, width: canvas.width, height: 20 });
+            walls.push({ x: 0, y: canvas.height - 20, width: canvas.width, height: 20 });
+            walls.push({ x: 0, y: 0, width: 20, height: canvas.height });
+            walls.push({ x: canvas.width - 20, y: 0, width: 20, height: canvas.height });
+
+            // Additional walls around the maze
+            walls.push({ x: 0, y: 10, width: 20, height: 400 });
+            walls.push({ x: 0, y: 100, width: 400, height: 20 });
+            walls.push({ x: 0, y: 100, width: 20, height: 400 });
+            walls.push({ x: 0, y: 480, width: 420, height: 20 });
+
+            // Random walls
+            generateRandomWalls();
+
+            // Stars
+            for (let i = 40; i < canvas.width - 40; i += 80) {
+                for (let j = 40; j < canvas.height - 40; j += 80) {
+                    // Check if the star is inside any wall, including the additional walls, and skip it if it is
+                    if (!walls.some(wall => (
+                        i > wall.x &&
+                        i < wall.x + wall.width &&
+                        j > wall.y &&
+                        j < wall.y + wall.height
+                    ))) {
+                        stars.push({
+                            x: i,
+                            y: j,
+                            radius: 5,
+                            collected: false
+                        });
+                    }
+                }
+            }
+
+            // Reset player position based on the image size
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height / 2 - player.height / 2;
+
+            // Reset ghost position
+            ghost.x = Math.random() * (canvas.width - 40) + 20;
+            ghost.y = Math.random() * (canvas.height - 40) + 20;
+        }
+
+        function drawPlayer() {
+            // Draw the player using the image
+            context.drawImage(playerImage, player.x, player.y, player.width, player.height);
+        }
+
+        function drawGhost() {
+            // Draw the ghost using the image
+            context.drawImage(ghostImage, ghost.x, ghost.y, ghost.width, ghost.height);
+        }
+
+        function drawWalls() {
+            walls.forEach(wall => {
+                context.fillStyle = "red";
+                context.fillRect(wall.x, wall.y, wall.width, wall.height);
+            });
+        }
+
+        function drawStars() {
+            context.fillStyle = "yellow";
+            stars.forEach(star => {
+                if (!star.collected) {
+                    context.beginPath();
+                    context.arc(star.x, star.y, star.radius, 0, 2 * Math.PI);
+                    context.fill();
+                    context.closePath();
+                }
+            });
+        }
+
+        function drawScore() {
+            document.getElementById("score").textContent = score;
+        }
+
+        function update() {
+            if (gameState === "playing") {
+                if (keysPressed.ArrowUp) {
+                    player.direction = { x: 0, y: -1 };
+                } else if (keysPressed.ArrowDown) {
+                    player.direction = { x: 0, y: 1 };
+                } else if (keysPressed.ArrowLeft) {
+                    player.direction = { x: -1, y: 0 };
+                } else if (keysPressed.ArrowRight) {
+                    player.direction = { x: 1, y: 0 };
+                }
+
+                // Save the current player position
+                const prevX = player.x;
+                const prevY = player.y;
+
+                // Update player position
+                player.x += player.direction.x * player.speed;
+                player.y += player.direction.y * player.speed;
+
+                // Check for collisions with walls
+                for (let i = 0; i < walls.length; i++) {
+                    const wall = walls[i];
+                    if (
+                        player.x < wall.x + wall.width &&
+                        player.x + player.width > wall.x &&
+                        player.y < wall.y + wall.height &&
+                        player.y + player.height > wall.y
+                    ) {
+                        // Revert to the previous position if there's a collision
+                        player.x = prevX;
+                        player.y = prevY;
+                        player.direction = { x: 0, y: 0 };
+                        break;
+                    }
+                }
+
+                // Check if the new position is within the bounds of the canvas
+                if (
+                    player.x < 0 ||
+                    player.x + player.width > canvas.width ||
+                    player.y < 0 ||
+                    player.y + player.height > canvas.height
+                ) {
+                    // Revert to the previous position if out of bounds
+                    player.x = prevX;
+                    player.y = prevY;
+                    player.direction = { x: 0, y: 0 };
+                }
+
+                // Check for collisions with stars
+                for (let i = 0; i < stars.length; i++) {
+                    const star = stars[i];
+                    if (!star.collected && isPlayerCollidingWithStar(player, star)) {
+                        star.collected = true;
+                        score += 10;
+                    }
+                }
+
+                // Check if all stars are collected
+                if (stars.every(star => star.collected)) {
+                    gameState = "winnerend";
+                }
+
+                // Update ghost position
+                const angle = Math.atan2(player.y - ghost.y, player.x - ghost.x);
+                ghost.x += Math.cos(angle) * ghost.speed;
+                ghost.y += Math.sin(angle) * ghost.speed;
+
+                // Check for collisions with the player
+                if (isPlayerCollidingWithGhost(player, ghost)) {
+                    gameState = "gameOver";
+                }
+            }
+        }
+
+        // Helper function to check if the player is colliding with a star
+        function isPlayerCollidingWithStar(player, star) {
+            const playerCenterX = player.x + player.width / 2;
+            const playerCenterY = player.y + player.height / 2;
+            const distance = Math.sqrt((playerCenterX - star.x) ** 2 + (playerCenterY - star.y) ** 2);
+            return distance < player.width / 2 + star.radius;
+        }
+
+        // Helper function to check if the player is colliding with the ghost
+        function isPlayerCollidingWithGhost(player, ghost) {
+            return (
+                player.x < ghost.x + ghost.width &&
+                player.x + player.width > ghost.x &&
+                player.y < ghost.y + ghost.height &&
+                player.y + player.height > ghost.y
+            );
+        }
+
+        function clearCanvas() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function gameLoop() {
+            clearCanvas();
+
+            if (gameState === "startMenu") {
+                document.getElementById("startMenu").style.display = "block";
+                document.getElementById("gameOver").style.display = "none";
+            } else if (gameState === "gameOver") {
+                document.getElementById("startMenu").style.display = "none";
+                document.getElementById("gameOver").style.display = "block";
+            } else {
+                document.getElementById("startMenu").style.display = "none";
+                document.getElementById("gameOver").style.display = "none";
+
+                drawWalls();
+                drawPlayer();
+                drawGhost();
+                drawStars();
+                drawScore();
+                update();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function showNameInput() {
+            document.getElementById("nameInput").style.display = "block";
+        }
+
+        function startGame() {
+            playerName = document.getElementById("playerName").value;
+            generateMaze();
+            gameState = "playing";
+            score = 0;
+        }
+
+        function restartGame() {
+            document.getElementById("nameInput").style.display = "none";
+            document.getElementById("playerName").value = "";
+            playerName = "";
+            generateMaze();
+            gameState = "playing";
+            score = 0;
+        }
+
+        document.addEventListener("keydown", function (event) {
+            if (gameState === "playing") {
+                keysPressed[event.key] = true;
+            }
+        });
+
+        document.addEventListener("keyup", function (event) {
+            if (gameState === "playing") {
+                keysPressed[event.key] = false;
+            }
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>
